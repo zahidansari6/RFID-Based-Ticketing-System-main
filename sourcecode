@@ -1,0 +1,177 @@
+import java.util.HashMap;
+import java.util.Map;
+import com.pi4j.io.gpio.GpioController;
+import com.pi4j.io.gpio.GpioFactory;
+import com.pi4j.io.gpio.RaspiPin;
+import com.pi4j.io.i2c.I2CFactory;
+import com.pi4j.wiringpi.SoftTone;
+
+public class BusTicketPaymentSystem {
+    private static final int SS_PIN = 10;
+    private static final int RST_PIN = 9;
+    private static final int RATE = 200;
+    
+    private static final String PASS1 = "CHIBUEZE";
+    private static final String ACCT1 = "6A2D6707";
+    private static final String PASS2 = "SMART";
+    private static final String ACCT2 = "771F7363";
+
+    private static int balance1 = 1000;
+    private static int balance2 = 1000;
+
+    private static GpioController gpio;
+    private static LiquidCrystal lcd;
+    private static MFRC522 mfrc522;
+
+    private static Map<String, Integer> accountBalances = new HashMap<>();
+
+    public static void main(String[] args) {
+        gpio = GpioFactory.getInstance();
+        lcd = new LiquidCrystal(3, 2, 6, 4, 7, 5);
+        mfrc522 = new MFRC522(SS_PIN, RST_PIN);
+
+        accountBalances.put(ACCT1, balance1);
+        accountBalances.put(ACCT2, balance2);
+
+        setup();
+        while (true) {
+            loop();
+        }
+    }
+
+    private static void setup() {
+        lcd.begin(16, 4);
+        SoftTone.softToneCreate(RaspiPin.GPIO_00);
+        SoftTone.softToneCreate(RaspiPin.GPIO_01);
+        SoftTone.softToneCreate(RaspiPin.GPIO_02);
+
+        lcd.setCursor(0, 0);
+        lcd.print("WELCOME CHIBUEZE ");
+        delay(4000);
+        lcd.setCursor(0, 0);
+        lcd.print("   BUS TICKET       ");
+        lcd.setCursor(0, 1);
+        lcd.print(" PAYMENT SYSTEM  ");
+        delay(2000);
+        lcd.clear();
+
+        lcd.setCursor(0, 2);
+        lcd.print("                                  ");
+        lcd.setCursor(0, 3);
+        lcd.print("                                  ");
+    }
+
+    private static void loop() {
+        lcd.setCursor(0, 0);
+        lcd.print("Bus Fare is #");
+        lcd.print(RATE);
+        lcd.setCursor(0, 1);
+        lcd.print("  Swipe To Pay     ");
+
+        if (!mfrc522.PICC_IsNewCardPresent()) {
+            return;
+        }
+
+        if (!mfrc522.PICC_ReadCardSerial()) {
+            return;
+        }
+
+        String content = mfrc522.getUid().toUpperCase().replaceAll("\\s+", "");
+        System.out.println("UID tag: " + content);
+        
+        if (accountBalances.containsKey(content)) {
+            processPayment(content);
+        } else {
+            unregistered();
+        }
+        lcd.clear();
+    }
+
+    private static void processPayment(String uid) {
+        int balance = accountBalances.get(uid);
+
+        if (balance >= RATE) {
+            balance -= RATE;
+            accountBalances.put(uid, balance);
+
+            lcd.setCursor(0, 0);
+            lcd.print("   Hi " + (uid.equals(ACCT1) ? PASS1 : PASS2) + "   ");
+            lcd.setCursor(0, 1);
+            lcd.print("___Payment O.K___      ");
+        } else {
+            lcd.setCursor(0, 0);
+            lcd.print(" Sorry " + (uid.equals(ACCT1) ? PASS1 : PASS2) + "   ");
+            lcd.setCursor(0, 1);
+            lcd.print("Insuficient Fund");
+        }
+        delay(4000);
+        lcd.setCursor(0, 1);
+        lcd.print("_Balance is #");
+        lcd.print(accountBalances.get(uid));
+        delay(4000);
+    }
+
+    private static void unregistered() {
+        beep(1000, 500, 3);
+
+        lcd.setCursor(0, 0);
+        lcd.print(" UNREGISTERED              ");
+        delay(2000);
+        lcd.setCursor(0, 1);
+        lcd.print("PLS GET A VALID CARD");
+
+        for (int i = 0; i < 43; i++) {
+            lcd.scrollDisplayLeft();
+            delay(150);
+        }
+    }
+
+    private static void beep(int frequency, int duration, int times) {
+        for (int i = 0; i < times; i++) {
+            SoftTone.softToneWrite(RaspiPin.GPIO_00, frequency);
+            delay(duration);
+            SoftTone.softToneWrite(RaspiPin.GPIO_00, 0);
+            delay(duration);
+        }
+    }
+
+    private static void delay(int ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+class LiquidCrystal {
+    // Assuming a hypothetical library
+    public LiquidCrystal(int... pins) {}
+
+    public void begin(int cols, int rows) {}
+
+    public void setCursor(int col, int row) {}
+
+    public void print(String msg) {}
+
+    public void clear() {}
+
+    public void scrollDisplayLeft() {}
+}
+
+class MFRC522 {
+    // Assuming a hypothetical library
+    public MFRC522(int ssPin, int rstPin) {}
+
+    public boolean PICC_IsNewCardPresent() {
+        return false;
+    }
+
+    public boolean PICC_ReadCardSerial() {
+        return false;
+    }
+
+    public String getUid() {
+        return "";
+    }
+}
